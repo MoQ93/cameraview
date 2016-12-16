@@ -59,6 +59,12 @@ abstract class CameraViewImpl {
 
     abstract int getFlash();
 
+    abstract int getMaxZoom();
+
+    abstract void setZoom(int zoom);
+
+    abstract int getZoom();
+
     abstract void takePicture();
 
     abstract void setDisplayOrientation(int displayOrientation);

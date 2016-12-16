@@ -184,6 +184,8 @@ class Camera2 extends CameraViewImpl {
 
     private int mFlash;
 
+    private int maxZoom = -1;
+
     private int mDisplayOrientation;
 
     Camera2(Callback callback, PreviewImpl preview, Context context) {
@@ -316,6 +318,25 @@ class Camera2 extends CameraViewImpl {
     int getFlash() {
         return mFlash;
     }
+
+    @Override
+    int getMaxZoom() {
+        if (maxZoom < 0) {
+            maxZoom = 0;
+        }
+        return 0;
+    }
+
+    @Override
+    void setZoom(int zoom) {
+
+    }
+
+    @Override
+    int getZoom() {
+        return 0;
+    }
+
 
     @Override
     void takePicture() {

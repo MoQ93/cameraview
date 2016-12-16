@@ -28,6 +28,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.os.ParcelableCompat;
 import android.support.v4.os.ParcelableCompatCreatorCallbacks;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.widget.FrameLayout;
 
 import java.lang.annotation.Retention;
@@ -77,6 +78,9 @@ public class CameraView extends FrameLayout {
 
     private final DisplayOrientationDetector mDisplayOrientationDetector;
 
+    private float mDist;
+
+
     public CameraView(Context context) {
         this(context, null);
     }
@@ -96,13 +100,13 @@ public class CameraView extends FrameLayout {
             preview = new TextureViewPreview(context, this);
         }
         mCallbacks = new CallbackBridge();
-        if (Build.VERSION.SDK_INT < 21) {
-            mImpl = new Camera1(mCallbacks, preview);
-        } else if (Build.VERSION.SDK_INT < 23) {
-            mImpl = new Camera2(mCallbacks, preview, context);
-        } else {
-            mImpl = new Camera2Api23(mCallbacks, preview, context);
-        }
+//        if (Build.VERSION.SDK_INT < 21) { FIXME LATER USE THE Right versions
+        mImpl = new Camera1(mCallbacks, preview);
+//        } else if (Build.VERSION.SDK_INT < 23) {
+//            mImpl = new Camera2(mCallbacks, preview, context);
+//        } else {
+//            mImpl = new Camera2Api23(mCallbacks, preview, context);
+//        }
         // Attributes
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.CameraView, defStyleAttr,
                 R.style.Widget_CameraView);
@@ -192,6 +196,21 @@ public class CameraView extends FrameLayout {
                             MeasureSpec.EXACTLY),
                     MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getAction();
+
+        if (event.getPointerCount() > 1) {
+            // handle multi-touch events
+            if (action == MotionEvent.ACTION_POINTER_DOWN) {
+                mDist = getFingerSpacing(event);
+            } else if (action == MotionEvent.ACTION_MOVE) {
+                handleZoom(event);
+            }
+        }
+        return true;
     }
 
     @Override
@@ -368,6 +387,35 @@ public class CameraView extends FrameLayout {
     public int getFlash() {
         //noinspection WrongConstant
         return mImpl.getFlash();
+    }
+
+
+    private void handleZoom(MotionEvent event) {
+        int maxZoom = mImpl.getMaxZoom();
+        int zoom = mImpl.getZoom();
+        float newDist = getFingerSpacing(event);
+        if (newDist > mDist) {
+            //zoom in
+            if (zoom < maxZoom)
+                zoom++;
+        } else if (newDist < mDist) {
+            //zoom out
+            if (zoom > 0)
+                zoom--;
+        }
+        mDist = newDist;
+        mImpl.setZoom(zoom);
+    }
+
+    /**
+     * Determine the space between the first two fingers
+     */
+    private float getFingerSpacing(MotionEvent event) {
+        // ...
+        float x = event.getX(0) - event.getX(1);
+        float y = event.getY(0) - event.getY(1);
+
+        return (float) Math.sqrt(x * x + y * y);
     }
 
     /**

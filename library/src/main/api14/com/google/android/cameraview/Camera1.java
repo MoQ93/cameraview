@@ -65,6 +65,8 @@ class Camera1 extends CameraViewImpl {
 
     private int mFlash;
 
+    private int maxZoom = -1;
+
     private int mDisplayOrientation;
 
     Camera1(Callback callback, PreviewImpl preview) {
@@ -203,19 +205,33 @@ class Camera1 extends CameraViewImpl {
     }
 
     @Override
+    int getMaxZoom() {
+        if (maxZoom < 0) {
+            maxZoom = mCameraParameters.getMaxZoom();
+        }
+        return maxZoom;
+    }
+
+    @Override
+    void setZoom(int zoom) {
+        if (setZoomInternal(zoom)) {
+            mCamera.setParameters(mCameraParameters);
+        }
+    }
+
+    @Override
+    int getZoom() {
+        return mCameraParameters.getZoom();
+    }
+
+
+    @Override
     void takePicture() {
         if (!isCameraOpened()) {
             throw new IllegalStateException("Camera is not ready. Call start() before takePicture().");
         }
         if (getAutoFocus()) {
             mCamera.cancelAutoFocus();
-            mCamera.autoFocus(new Camera.AutoFocusCallback() {
-                @Override
-                public void onAutoFocus(boolean success, Camera camera) {
-                    takePictureInternal();
-                }
-            });
-        } else {
             takePictureInternal();
         }
     }
@@ -416,5 +432,15 @@ class Camera1 extends CameraViewImpl {
             return false;
         }
     }
+
+    private boolean setZoomInternal(int zoom) {
+        if (isCameraOpened() && mCameraParameters.isZoomSupported()) {
+            mCameraParameters.setZoom(zoom);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 
 }
