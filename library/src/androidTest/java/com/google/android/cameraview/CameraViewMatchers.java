@@ -16,32 +16,27 @@
 
 package com.google.android.cameraview;
 
-import android.app.Activity;
-import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.view.View;
 
-import com.google.android.cameraview.test.R;
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
 
-public class CameraViewActivity extends Activity {
+class CameraViewMatchers {
 
-    private CameraView mCameraView;
+    static Matcher<View> hasAspectRatio(@NonNull final AspectRatio ratio) {
+        return new TypeSafeMatcher<View>() {
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("has aspect ratio of " + ratio);
+            }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_camera_view);
-        mCameraView = (CameraView) findViewById(R.id.camera);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        mCameraView.start();
-    }
-
-    @Override
-    protected void onPause() {
-        mCameraView.stop();
-        super.onPause();
+            @Override
+            protected boolean matchesSafely(View view) {
+                return ratio.equals(((CameraView) view).getAspectRatio());
+            }
+        };
     }
 
 }

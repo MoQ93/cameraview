@@ -70,7 +70,7 @@ public class CameraView extends FrameLayout {
     public @interface Flash {
     }
 
-    final CameraViewImpl mImpl;
+    CameraViewImpl mImpl;
 
     private final CallbackBridge mCallbacks;
 
@@ -93,12 +93,7 @@ public class CameraView extends FrameLayout {
     public CameraView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         // Internal setup
-        final PreviewImpl preview;
-        if (Build.VERSION.SDK_INT < 14) {
-            preview = new SurfaceViewPreview(context, this);
-        } else {
-            preview = new TextureViewPreview(context, this);
-        }
+        final PreviewImpl preview = createPreviewImpl(context);
         mCallbacks = new CallbackBridge();
 //        if (Build.VERSION.SDK_INT < 21) { FIXME LATER USE THE Right versions
         mImpl = new Camera1(mCallbacks, preview);
@@ -128,6 +123,17 @@ public class CameraView extends FrameLayout {
                 mImpl.setDisplayOrientation(displayOrientation);
             }
         };
+    }
+
+    @NonNull
+    private PreviewImpl createPreviewImpl(Context context) {
+        PreviewImpl preview;
+        if (Build.VERSION.SDK_INT < 14) {
+            preview = new SurfaceViewPreview(context, this);
+        } else {
+            preview = new TextureViewPreview(context, this);
+        }
+        return preview;
     }
 
     @Override
@@ -242,7 +248,14 @@ public class CameraView extends FrameLayout {
      * {@link Activity#onResume()}.
      */
     public void start() {
-        mImpl.start();
+        if (!mImpl.start()) {
+            //store the state ,and restore this state after fall back o Camera1
+            Parcelable state=onSaveInstanceState();
+            // Camera2 uses legacy hardware layer; fall back to Camera1
+            mImpl = new Camera1(mCallbacks, createPreviewImpl(getContext()));
+            onRestoreInstanceState(state);
+            mImpl.start();
+        }
     }
 
     /**
@@ -335,7 +348,9 @@ public class CameraView extends FrameLayout {
      * @param ratio The {@link AspectRatio} to be set.
      */
     public void setAspectRatio(@NonNull AspectRatio ratio) {
-        mImpl.setAspectRatio(ratio);
+        if (mImpl.setAspectRatio(ratio)) {
+            requestLayout();
+        }
     }
 
     /**

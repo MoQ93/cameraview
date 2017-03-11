@@ -30,7 +30,6 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
-import android.os.Build;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.SparseIntArray;
@@ -192,19 +191,22 @@ class Camera2 extends CameraViewImpl {
         super(callback, preview);
         mCameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         mPreview.setCallback(new PreviewImpl.Callback() {
-                @Override
-                public void onSurfaceChanged() {
-                    startCaptureSession();
-                }
-            });
+            @Override
+            public void onSurfaceChanged() {
+                startCaptureSession();
+            }
+        });
     }
 
     @Override
-    void start() {
-        chooseCameraIdByFacing();
+    boolean start() {
+        if (!chooseCameraIdByFacing()) {
+            return false;
+        }
         collectCameraInfo();
         prepareImageReader();
         startOpeningCamera();
+        return true;
     }
 
     @Override
@@ -251,11 +253,11 @@ class Camera2 extends CameraViewImpl {
     }
 
     @Override
-    void setAspectRatio(AspectRatio ratio) {
+    boolean setAspectRatio(AspectRatio ratio) {
         if (ratio == null || ratio.equals(mAspectRatio) ||
                 !mPreviewSizes.ratios().contains(ratio)) {
             // TODO: Better error handling
-            return;
+            return false;
         }
         mAspectRatio = ratio;
         if (mCaptureSession != null) {
@@ -263,6 +265,7 @@ class Camera2 extends CameraViewImpl {
             mCaptureSession = null;
             startCaptureSession();
         }
+        return true;
     }
 
     @Override
@@ -358,12 +361,21 @@ class Camera2 extends CameraViewImpl {
      * <p>This rewrites {@link #mCameraId}, {@link #mCameraCharacteristics}, and optionally
      * {@link #mFacing}.</p>
      */
-    private void chooseCameraIdByFacing() {
+    private boolean chooseCameraIdByFacing() {
         try {
             int internalFacing = INTERNAL_FACINGS.get(mFacing);
             final String[] ids = mCameraManager.getCameraIdList();
+            if (ids.length == 0) { // No camera
+                throw new RuntimeException("No camera available.");
+            }
             for (String id : ids) {
                 CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(id);
+                Integer level = characteristics.get(
+                        CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+                if (level == null ||
+                        level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
+                    continue;
+                }
                 Integer internal = characteristics.get(CameraCharacteristics.LENS_FACING);
                 if (internal == null) {
                     throw new NullPointerException("Unexpected state: LENS_FACING null");
@@ -371,12 +383,18 @@ class Camera2 extends CameraViewImpl {
                 if (internal == internalFacing) {
                     mCameraId = id;
                     mCameraCharacteristics = characteristics;
-                    return;
+                    return true;
                 }
             }
             // Not found
             mCameraId = ids[0];
             mCameraCharacteristics = mCameraManager.getCameraCharacteristics(mCameraId);
+            Integer level = mCameraCharacteristics.get(
+                    CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+            if (level == null ||
+                    level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
+                return false;
+            }
             Integer internal = mCameraCharacteristics.get(CameraCharacteristics.LENS_FACING);
             if (internal == null) {
                 throw new NullPointerException("Unexpected state: LENS_FACING null");
@@ -384,12 +402,13 @@ class Camera2 extends CameraViewImpl {
             for (int i = 0, count = INTERNAL_FACINGS.size(); i < count; i++) {
                 if (INTERNAL_FACINGS.valueAt(i) == internal) {
                     mFacing = INTERNAL_FACINGS.keyAt(i);
-                    return;
+                    return true;
                 }
             }
             // The operation can reach here when the only camera device is an external one.
             // We treat it as facing back.
             mFacing = Constants.FACING_BACK;
+            return true;
         } catch (CameraAccessException e) {
             throw new RuntimeException("Failed to get a list of camera devices", e);
         }
@@ -617,8 +636,8 @@ class Camera2 extends CameraViewImpl {
                     new CameraCaptureSession.CaptureCallback() {
                         @Override
                         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
-                                                       @NonNull CaptureRequest request,
-                                                       @NonNull TotalCaptureResult result) {
+                                @NonNull CaptureRequest request,
+                                @NonNull TotalCaptureResult result) {
                             unlockFocus();
                         }
                     }, null);
@@ -672,15 +691,13 @@ class Camera2 extends CameraViewImpl {
 
         @Override
         public void onCaptureProgressed(@NonNull CameraCaptureSession session,
-                                        @NonNull CaptureRequest request,
-                                        @NonNull CaptureResult partialResult) {
+                @NonNull CaptureRequest request, @NonNull CaptureResult partialResult) {
             process(partialResult);
         }
 
         @Override
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
-                                       @NonNull CaptureRequest request,
-                                       @NonNull TotalCaptureResult result) {
+                @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
             process(result);
         }
 
@@ -707,7 +724,8 @@ class Camera2 extends CameraViewImpl {
                 case STATE_PRECAPTURE: {
                     Integer ae = result.get(CaptureResult.CONTROL_AE_STATE);
                     if (ae == null || ae == CaptureResult.CONTROL_AE_STATE_PRECAPTURE ||
-                            ae == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED) {
+                            ae == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED ||
+                            ae == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
                         setState(STATE_WAITING);
                     }
                     break;
