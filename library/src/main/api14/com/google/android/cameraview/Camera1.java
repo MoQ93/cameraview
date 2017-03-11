@@ -243,8 +243,7 @@ class Camera1 extends CameraViewImpl {
                 public void onAutoFocus(boolean success, Camera camera) {
                     takePictureInternal();
                 }
-            })
-
+            });
         } else {
           mCamera.takePictureInternal();
         }
