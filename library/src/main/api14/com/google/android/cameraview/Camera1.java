@@ -245,7 +245,7 @@ class Camera1 extends CameraViewImpl {
                 }
             });
         } else {
-          mCamera.takePictureInternal();
+            takePictureInternal();
         }
     }
 
