@@ -191,16 +191,30 @@ public class CameraView extends FrameLayout {
             ratio = ratio.inverse();
         }
         assert ratio != null;
-        if (height < width * ratio.getY() / ratio.getX()) {
+        int viewWidth = mImpl.getView().getMeasuredWidth();
+        int viewHeight = mImpl.getView().getMeasuredHeight();
+        float cameraRatio;
+        if (height >= width) {
+            cameraRatio = (float) 4 / 3;
+        } else {
+            cameraRatio = (float) 3 / 4;
+        }
+
+        float camHeight = width * cameraRatio;
+        float newHeightRatio;
+        float newCamHeight;
+        if (camHeight < height) {
+            newHeightRatio = (float) height / (float) viewHeight;
+            newCamHeight = (newHeightRatio * camHeight);
             mImpl.getView().measure(
-                    MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(width * ratio.getY() / ratio.getX(),
+                    MeasureSpec.makeMeasureSpec((int) (width * newHeightRatio), MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec((int) (newCamHeight),
                             MeasureSpec.EXACTLY));
         } else {
             mImpl.getView().measure(
-                    MeasureSpec.makeMeasureSpec(height * ratio.getX() / ratio.getY(),
-                            MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
+                    MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec((int) (camHeight),
+                            MeasureSpec.EXACTLY));
         }
     }
 
